@@ -17,6 +17,8 @@ export default function Home() {
 
   const [numberOfWhitelisted, setNumberOfWhitelisted] = useState(0);
 
+  const [scError, setScError] = useState();
+
   const web3ModalRef = useRef();
 
   async function getProviderOrSigner(needSigner = false) {
@@ -44,6 +46,7 @@ export default function Home() {
     try {
       await getProviderOrSigner();
       setWalletConnected(true);
+      getNumberOfWhitelisted();
     } catch (error) {
       console.log("ERROR", error);
     }
@@ -61,6 +64,22 @@ export default function Home() {
     }
   }, []);
 
+  const getNumberOfWhitelisted = async () => {
+    try {
+      console.log("Calling getNumberOfWhitelisted");
+      const provider = await getProviderOrSigner();
+      const contract = new Contract(WHITELIST_CONTRACT_ADDRESS, abi, provider);
+
+      const numberOfWhitelisted = await contract.numAddressesWhitelisted();
+
+      console.log(numberOfWhitelisted);
+
+      setNumberOfWhitelisted(numberOfWhitelisted);
+    } catch (error) {
+      console.log("ERROR IN FEATCHING NUMBER OF WHITELISTED", error);
+    }
+  };
+
   const addAddressToWhitelist = async () => {
     try {
       const signer = await getProviderOrSigner(true);
@@ -71,14 +90,21 @@ export default function Home() {
       setLoading(true);
       await tx.wait();
       setLoading(false);
+      getNumberOfWhitelisted();
     } catch (error) {
-      console.log("ERROR", error);
+      // console.log(typeof error)
+      // console.log(Object.keys(error));
+      // console.log(error.error)
+      console.log(error.error.message);
+      // console.log("ERROR !!!!!!###", error.error.message);
+
+      setScError(error.error.message);
     }
   };
 
   function handleConnectWallet() {
     console.log("WALLET CONNECTED ANISH");
-    addAddressToWhitelist();
+    addAddressToWhitelist(); // async
   }
 
   function renderButton() {
@@ -89,7 +115,7 @@ export default function Home() {
       } else if (loading) {
         return <p>Loading.....</p>;
       } else {
-        return <button onClick={handleConnectWallet}>Connect to wallet</button>;
+        return <button onClick={handleConnectWallet}>Join whitelist</button>;
       }
     }
   }
@@ -107,7 +133,10 @@ export default function Home() {
 
         {renderButton()}
 
-        {loading ? <p>Loading.....</p> : <p>not loading....</p>}
+        <p>Total member joined is {numberOfWhitelisted}</p>
+
+        {scError && <p>{scError}</p>}
+
       </main>
     </div>
   );
