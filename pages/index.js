@@ -1,8 +1,99 @@
 import Head from "next/head";
 import Image from "next/image";
 import styles from "../styles/Home.module.css";
+import Web3Modal from "web3modal";
+import { providers, Contract } from "ethers";
+
+import { useState, useEffect, useRef } from "react";
+
+import { WHITELIST_CONTRACT_ADDRESS, abi } from "../constants";
 
 export default function Home() {
+  const [walletConnected, setWalletConnected] = useState(false);
+
+  const [joinedWhitelist, setJoinedWhitelist] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+
+  const [numberOfWhitelisted, setNumberOfWhitelisted] = useState(0);
+
+  const web3ModalRef = useRef();
+
+  async function getProviderOrSigner(needSigner = false) {
+    console.log("I am running");
+    // connect to MM
+    const provider = await web3ModalRef.current.connect();
+    const web3Provider = new providers.Web3Provider(provider);
+
+    const { chainId } = await web3Provider.getNetwork();
+
+    if (chainId !== 4) {
+      window.alert("Change your network to Rinkeby Testnet");
+      throw new Error("Change your network to Rinkeby Testnet");
+    }
+    if (needSigner) {
+      const signer = web3Provider.getSigner();
+      return signer;
+    }
+
+    return web3Provider;
+  }
+
+  async function connectWallet() {
+    console.log("Wallet connecting.....");
+    try {
+      await getProviderOrSigner();
+      setWalletConnected(true);
+    } catch (error) {
+      console.log("ERROR", error);
+    }
+  }
+
+  useEffect(() => {
+    console.log("USE EFFCET RUNS");
+    if (!walletConnected) {
+      web3ModalRef.current = new Web3Modal({
+        network: "rinkeby",
+        providerOptions: {},
+        disableInjectedProvider: false,
+      });
+      connectWallet();
+    }
+  }, []);
+
+  const addAddressToWhitelist = async () => {
+    try {
+      const signer = await getProviderOrSigner(true);
+      const contract = new Contract(WHITELIST_CONTRACT_ADDRESS, abi, signer);
+
+      const tx = await contract.addAddressesToWhitelist();
+
+      setLoading(true);
+      await tx.wait();
+      setLoading(false);
+    } catch (error) {
+      console.log("ERROR", error);
+    }
+  };
+
+  function handleConnectWallet() {
+    console.log("WALLET CONNECTED ANISH");
+    addAddressToWhitelist();
+  }
+
+  function renderButton() {
+    if (walletConnected) {
+      if (joinedWhitelist) {
+        console.log("Already JOINED");
+        return <div>Thanks for joining</div>;
+      } else if (loading) {
+        return <p>Loading.....</p>;
+      } else {
+        return <button onClick={handleConnectWallet}>Connect to wallet</button>;
+      }
+    }
+  }
+
   return (
     <div className={styles.container}>
       <Head>
@@ -13,6 +104,10 @@ export default function Home() {
 
       <main className={styles.main}>
         <h2>Whitelist DAPP</h2>
+
+        {renderButton()}
+
+        {loading ? <p>Loading.....</p> : <p>not loading....</p>}
       </main>
     </div>
   );
